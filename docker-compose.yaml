@@ -1,23 +1,51 @@
 version: '3.3'
 services:
   registry:
-    image: 'registry:2'
+    image: registry:2
     container_name: registry
-    restart: always
+    restart: unless-stopped
     networks:
         registry:
     ports:
-      - '5000:5000'
+      - 5000:5000
     environment:
       - 'REGISTRY_STORAGE_DELETE_ENABLED=true'
       - TZ=Europe/Moscow
     volumes:
       - ./registry_data:/var/lib/registry
-      - ./config.yml:/etc/docker/registry/config.yml
-      - /etc/ssl/fullchain.pem:/etc/ssl/fullchain.pem
-      - /etc/ssl/privkey.pem:/etc/ssl/privkey.pem
-      - ./auth.htpasswd:/etc/docker/registry/auth.htpasswd
-   
+      - ./config.yml:/etc/docker/registry/config.yml:ro
+      - /etc/ssl/fullchain.pem:/etc/ssl/fullchain.pem:ro
+      - /etc/ssl/privkey.pem:/etc/ssl/privkey.pem:ro
+      - ./auth.htpasswd:/etc/docker/registry/auth.htpasswd:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.docker-mirror.loadbalancer.server.port=5000"
+      - "traefik.http.routers.docker-mirror.service=docker-mirror"
+      - "traefik.http.routers.docker-mirror.rule=Host(`${HOSTNAME}`)"
+      - "traefik.http.routers.docker-mirror.entrypoints=https"
+      - "traefik.http.routers.docker-mirror.tls=true"
+      - "traefik.http.routers.docker-mirror.tls.certresolver=letsencrypt"
+      - "traefik.http.middlewares.docker-mirror-rewrite.replacepathregex.regex=^/v2/([^/]+)/((manifests|blobs)/.+)"
+      - "traefik.http.middlewares.docker-mirror-rewrite.replacepathregex.replacement=/v2/library/$$1/$$2"
+      - "traefik.http.routers.docker-mirror.middlewares=docker-mirror-rewrite"  
+  
+  traefik:
+    image: traefik:3.0
+    container_name: front
+    restart: unless-stopped
+    networks:
+        registry:
+    ports:
+      - 80:80
+      - 443:443
+      # - 8080:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./certs-traefik:/etc/traefik/acme
+    depends_on:
+      - registry
+
   registry-ui:
     container_name: registry-ui
     image: joxit/docker-registry-ui:main

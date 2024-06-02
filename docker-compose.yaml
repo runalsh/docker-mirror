@@ -77,7 +77,7 @@ services:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
     labels:
       - "traefik.enable=true"
-      - "traefik.http.services.docker-mirror.loadbalancer.server.port=443"
+      - "traefik.http.services.docker-mirror.loadbalancer.server.port=5001"
       - "traefik.http.routers.docker-mirror.service=docker-mirror"
       - "traefik.http.routers.docker-mirror.rule=Host(`${HOSTNAME}`)"
       - "traefik.http.routers.docker-mirror.entrypoints=https"
